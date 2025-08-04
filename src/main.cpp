@@ -42,7 +42,7 @@ namespace conway
         [[nodiscard]]
         std::size_t get_cell_count() const noexcept
         {
-            return m_set_active_next.size();
+            return m_alive_cells.size();
         }
 
         /**
@@ -51,7 +51,7 @@ namespace conway
         [[nodiscard]]
         std::size_t get_potential_count() const noexcept
         {
-            return m_set_potential_next.size();
+            return m_neighbor_counts.size();
         }
 
         /**
@@ -60,7 +60,7 @@ namespace conway
         [[nodiscard]]
         const std::unordered_set<Vec2i, HashVec2i> &get_cells() const noexcept
         {
-            return m_set_active;
+            return m_alive_cells;
         }
 
         /**
@@ -76,28 +76,35 @@ namespace conway
          */
         void cleanup() noexcept
         {
-            m_set_active.clear();
-            m_set_active_next.clear();
-            m_set_potential.clear();
-            m_set_potential_next.clear();
+            m_alive_cells.clear();
+            m_neighbor_counts.clear();
         }
 
         /**
          * @brief Add an alive cell on the given position
-         * 
+         *
          * @param v Cell position
          */
         void add_alive_cell(const Vec2i &v) noexcept
         {
-            m_set_active_next.insert(v);
-            m_set_active.insert(v);
-
-            for (int y = -1; y <= 1; ++y)
+            // Only update neighbors if cell was actually inserted
+            if (m_alive_cells.insert(v).second)
             {
-                for (int x = -1; x <= 1; ++x)
-                {
-                    m_set_potential_next.insert(Vec2i{v.x + x, v.y + y});
-                }
+                update_neighbor_counts(v, 1);
+            }
+        }
+
+        /**
+         * @brief Remove an alive cell from the given position
+         *
+         * @param v Cell position
+         */
+        void remove_alive_cell(const Vec2i &v) noexcept
+        {
+            // Only update neighbors if cell was actually removed
+            if (m_alive_cells.erase(v) > 0)
+            {
+                update_neighbor_counts(v, -1);
             }
         }
 
@@ -109,92 +116,100 @@ namespace conway
             if (m_paused)
                 return;
 
-            m_set_active = m_set_active_next;
-            m_set_active_next.clear();
-            m_set_active_next.reserve(m_set_active.size());
+            std::unordered_set<Vec2i, HashVec2i> next_alive{};
+            next_alive.reserve(m_alive_cells.size());
 
-            m_set_potential = m_set_potential_next;
-            m_set_potential_next = m_set_active;
+            std::unordered_map<Vec2i, int, HashVec2i> next_neighbor_counts{};
+            next_neighbor_counts.reserve(m_neighbor_counts.size());
 
-            for (const auto &c : m_set_potential)
+            for (const auto &[cell, neighbor_count] : m_neighbor_counts)
             {
-                int neighbors{};
-                for (int y = -1; y <= 1; ++y)
-                {
-                    for (int x = -1; x <= 1; ++x)
-                    {
-                        if (x == 0 && y == 0)
-                            continue;
-                        neighbors += get_cell_state(Vec2i{c.x + x, c.y + y});
-                    }
-                }
+                bool is_alive{m_alive_cells.contains(cell)};
+                bool will_be_alive{false};
 
-                // Cell is currently alive, check its state next epoch
-                if (get_cell_state(c))
+                // Live cell survives with 2 or 3 neighbors
+                if (is_alive)
                 {
-                    // Die from isolation or overpopulation
-                    if (neighbors < 2 || neighbors > 3)
-                    {
-                        // Neighbors are stimulated for next epoch
-                        for (int y = -1; y <= 1; ++y)
-                        {
-                            for (int x = -1; x <= 1; ++x)
-                            {
-                                m_set_potential_next.insert(Vec2i{c.x + x, c.y + y});
-                            }
-                        }
-                    }
-                    else
-                    {
-                        m_set_active_next.insert(c);
-                    }
+                    will_be_alive = (neighbor_count == 2 || neighbor_count == 3);
                 }
-                // Cell currently is dead, check if it's alive next epoch
+                // Dead cell becomes alive with exactly 3 neighbors
                 else
                 {
-                    if (neighbors == 3)
-                    {
-                        // Spawn cell
-                        m_set_active_next.insert(c);
+                    will_be_alive = (neighbor_count == 3);
+                }
 
-                        // Neighbors are stimulated for next epoch
-                        for (int y = -1; y <= 1; ++y)
-                        {
-                            for (int x = -1; x <= 1; ++x)
-                            {
-                                m_set_potential_next.insert(Vec2i{c.x + x, c.y + y});
-                            }
-                        }
-                    }
+                // Update neighbor counts for the next generation
+                if (will_be_alive)
+                {
+                    next_alive.insert(cell);
+                    update_neighbor_counts_map(next_neighbor_counts, cell, 1);
                 }
             }
+
+            m_alive_cells = std::move(next_alive);
+            m_neighbor_counts = std::move(next_neighbor_counts);
         }
 
     private:
         /**
-         * @brief Return true if cell is alive
-         * 
-         * @param v Cell position
+         * @brief Update neighbor counts when adding/removing a cell
+         *
+         * @param cell The cell being added/removed
+         * @param delta +1 for adding, -1 for removing
          */
-        [[nodiscard]]
-        bool get_cell_state(const Vec2i &v) const noexcept
+        void update_neighbor_counts(const Vec2i &cell, int delta) noexcept
         {
-            return m_set_active.contains(v);
+            // Cache friendly
+            static constexpr std::array<Vec2i, 8> neighbor_offsets = {{{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+
+            for (const auto &offset : neighbor_offsets)
+            {
+                Vec2i neighbor = {cell.x + offset.x, cell.y + offset.y};
+
+                auto it = m_neighbor_counts.find(neighbor);
+                if (it != m_neighbor_counts.end())
+                {
+                    it->second += delta;
+                    // Remove entries with zero neighbors to keep map small
+                    if (it->second == 0)
+                    {
+                        m_neighbor_counts.erase(it);
+                    }
+                }
+                else if (delta > 0)
+                {
+                    // Only add new entries when incrementing
+                    m_neighbor_counts[neighbor] = delta;
+                }
+            }
+        }
+
+        /**
+         * @brief Update neighbor counts in a given map
+         */
+        void update_neighbor_counts_map(std::unordered_map<Vec2i, int, HashVec2i> &counts,
+                                        const Vec2i &cell, int delta) noexcept
+        {
+            static constexpr std::array<Vec2i, 8> neighbor_offsets = {{{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+
+            for (const auto &offset : neighbor_offsets)
+            {
+                Vec2i neighbor = {cell.x + offset.x, cell.y + offset.y};
+                counts[neighbor] += delta;
+            }
         }
 
     private:
         bool m_paused{false};
-        std::unordered_set<Vec2i, HashVec2i> m_set_active{};
-        std::unordered_set<Vec2i, HashVec2i> m_set_active_next{};
-        std::unordered_set<Vec2i, HashVec2i> m_set_potential{};
-        std::unordered_set<Vec2i, HashVec2i> m_set_potential_next{};
+        std::unordered_set<Vec2i, HashVec2i> m_alive_cells{};
+        std::unordered_map<Vec2i, int, HashVec2i> m_neighbor_counts{};
     };
 
 }
 
 /**
  * @brief Convert a set to vertices
- * 
+ *
  * @param positions Alive cells positions
  */
 [[nodiscard]]
@@ -234,7 +249,7 @@ int main()
     conway::GameOfLife gol{};
 
     sf::RenderWindow window(sf::VideoMode({1280, 720}), "Infinite Conway Game Of Life");
-    sf::View view{{0.0f, 0.0f}, {400.0f, 200.0f}};
+    sf::View view{{0.0f, 0.0f}, {500.0f, 250.0f}};
     window.setView(view);
     sf::Clock delta_clock{};
     sf::Clock input_clock{};
