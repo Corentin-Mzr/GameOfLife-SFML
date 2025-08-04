@@ -160,13 +160,13 @@ namespace conway
         void update_neighbor_counts(const Vec2i &cell, int delta) noexcept
         {
             // Cache friendly
-            static constexpr std::array<Vec2i, 8> neighbor_offsets = {{{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+            static constexpr std::array<Vec2i, 8> neighbor_offsets{{{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
 
             for (const auto &offset : neighbor_offsets)
             {
-                Vec2i neighbor = {cell.x + offset.x, cell.y + offset.y};
+                Vec2i neighbor{cell.x + offset.x, cell.y + offset.y};
 
-                auto it = m_neighbor_counts.find(neighbor);
+                auto it{m_neighbor_counts.find(neighbor)};
                 if (it != m_neighbor_counts.end())
                 {
                     it->second += delta;
@@ -190,11 +190,11 @@ namespace conway
         void update_neighbor_counts_map(std::unordered_map<Vec2i, int, HashVec2i> &counts,
                                         const Vec2i &cell, int delta) noexcept
         {
-            static constexpr std::array<Vec2i, 8> neighbor_offsets = {{{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
+            static constexpr std::array<Vec2i, 8> neighbor_offsets{{{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 1}, {1, -1}, {1, 0}, {1, 1}}};
 
             for (const auto &offset : neighbor_offsets)
             {
-                Vec2i neighbor = {cell.x + offset.x, cell.y + offset.y};
+                Vec2i neighbor{cell.x + offset.x, cell.y + offset.y};
                 counts[neighbor] += delta;
             }
         }
@@ -230,13 +230,13 @@ sf::VertexArray set_to_vertex_array(const std::unordered_set<conway::Vec2i, conw
         sf::Vector2f bottomRight(x + hsize, y + hsize);
         sf::Vector2f bottomLeft(x - hsize, y + hsize);
 
-        triangles[i++] = (sf::Vertex(topLeft, sf::Color::White));
-        triangles[i++] = (sf::Vertex(topRight, sf::Color::White));
-        triangles[i++] = (sf::Vertex(bottomRight, sf::Color::White));
+        triangles[i++] = sf::Vertex(topLeft, sf::Color::White);
+        triangles[i++] = sf::Vertex(topRight, sf::Color::White);
+        triangles[i++] = sf::Vertex(bottomRight, sf::Color::White);
 
-        triangles[i++] = (sf::Vertex(bottomRight, sf::Color::White));
-        triangles[i++] = (sf::Vertex(bottomLeft, sf::Color::White));
-        triangles[i++] = (sf::Vertex(topLeft, sf::Color::White));
+        triangles[i++] = sf::Vertex(bottomRight, sf::Color::White);
+        triangles[i++] = sf::Vertex(bottomLeft, sf::Color::White);
+        triangles[i++] = sf::Vertex(topLeft, sf::Color::White);
     }
 
     return triangles;
@@ -253,6 +253,7 @@ int main()
     window.setView(view);
     sf::Clock delta_clock{};
     sf::Clock input_clock{};
+    sf::Clock profiling_clock{};
 
     constexpr float zoom_factor{0.1f};
     float camera_spd{0.1f};
@@ -272,6 +273,7 @@ int main()
         sf::View new_view{window.getView()};
         sf::Vector2f new_view_center{new_view.getCenter()};
         sf::Vector2f dpos{};
+        input_dt = input_clock.restart().asSeconds();
 
         while (const std::optional event = window.pollEvent())
         {
@@ -301,31 +303,6 @@ int main()
                 }
             }
 
-            /* Add on cell on screen with left click */
-            if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
-            {
-                sf::Vector2i mouse_local{sf::Mouse::getPosition(window)};
-                sf::Vector2f world_pos{window.mapPixelToCoords(mouse_local)};
-                gol.add_alive_cell(conway::Vec2i{static_cast<int>(std::round(world_pos.x)), static_cast<int>(std::round(world_pos.y))});
-            }
-
-            /* Add a bunch of cells on screen with right click */
-            if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Right))
-            {
-                sf::Vector2i mouse_local{sf::Mouse::getPosition(window)};
-                sf::Vector2f world_pos{window.mapPixelToCoords(mouse_local)};
-                for (int i = -50; i <= 50; i++)
-                {
-                    for (int j = -50; j < 50; j++)
-                    {
-                        if (rand() % 2)
-                        {
-                            gol.add_alive_cell(conway::Vec2i{static_cast<int>(std::round(world_pos.x) + i), static_cast<int>(std::round(world_pos.y) + j)});
-                        }
-                    }
-                }
-            }
-
             /* Zoom with wheel */
             if (const auto *mouse_wheel_scrolled = event->getIf<sf::Event::MouseWheelScrolled>())
             {
@@ -337,9 +314,32 @@ int main()
             }
         }
 
-        /* Move in world with WASD - ZQSD */
-        input_dt = input_clock.restart().asSeconds();
+        /* Add on cell on screen with left click */
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
+        {
+            sf::Vector2i mouse_local{sf::Mouse::getPosition(window)};
+            sf::Vector2f world_pos{window.mapPixelToCoords(mouse_local)};
+            gol.add_alive_cell(conway::Vec2i{static_cast<int>(std::round(world_pos.x)), static_cast<int>(std::round(world_pos.y))});
+        }
 
+        /* Add a bunch of cells on screen with right click */
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Right))
+        {
+            sf::Vector2i mouse_local{sf::Mouse::getPosition(window)};
+            sf::Vector2f world_pos{window.mapPixelToCoords(mouse_local)};
+            for (int i = -50; i <= 50; i++)
+            {
+                for (int j = -50; j < 50; j++)
+                {
+                    if (rand() % 2)
+                    {
+                        gol.add_alive_cell(conway::Vec2i{static_cast<int>(std::round(world_pos.x) + i), static_cast<int>(std::round(world_pos.y) + j)});
+                    }
+                }
+            }
+        }
+
+        /* Move in world with WASD - ZQSD */
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::W))
         {
             dpos.y += -camera_spd * input_dt;
@@ -408,17 +408,16 @@ int main()
         window.setView(new_view);
 
         /* Update simu */
-        sf::Clock clk{};
+        profiling_clock.restart();
         gol.update();
-        const auto &cells{gol.get_cells()};
-        simu_time = clk.restart().asMilliseconds();
+        simu_time = profiling_clock.restart().asMilliseconds();
 
         /* Draw */
-        clk.restart();
+        profiling_clock.restart();
         window.clear(sf::Color::Black);
-        window.draw(set_to_vertex_array(cells));
+        window.draw(set_to_vertex_array(gol.get_cells()));
         ImGui::SFML::Render(window);
         window.display();
-        draw_time = clk.restart().asMilliseconds();
+        draw_time = profiling_clock.restart().asMilliseconds();
     }
 }
