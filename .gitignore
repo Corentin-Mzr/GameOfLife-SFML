@@ -1,0 +1,8 @@
+build
+out
+.cache
+.idea
+.vs
+.vscode
+github-releases
+deprecated
