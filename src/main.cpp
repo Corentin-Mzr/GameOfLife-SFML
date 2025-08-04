@@ -36,29 +36,44 @@ namespace conway
     public:
         explicit constexpr GameOfLife() noexcept = default;
 
+        /**
+         * @brief Return number of alive cells
+         */
         [[nodiscard]]
         std::size_t get_cell_count() const noexcept
         {
             return m_set_active_next.size();
         }
 
+        /**
+         * @brief Return number of checked cells
+         */
         [[nodiscard]]
         std::size_t get_potential_count() const noexcept
         {
             return m_set_potential_next.size();
         }
 
+        /**
+         * @brief Return the set of alive cells
+         */
         [[nodiscard]]
         const std::unordered_set<Vec2i, HashVec2i> &get_cells() const noexcept
         {
             return m_set_active;
         }
 
+        /**
+         * @brief Pause/Unpause the simulation
+         */
         void toggle_pause() noexcept
         {
             m_paused = !m_paused;
         }
 
+        /**
+         * @brief Reset the simulation
+         */
         void cleanup() noexcept
         {
             m_set_active.clear();
@@ -67,6 +82,11 @@ namespace conway
             m_set_potential_next.clear();
         }
 
+        /**
+         * @brief Add an alive cell on the given position
+         * 
+         * @param v Cell position
+         */
         void add_alive_cell(const Vec2i &v) noexcept
         {
             m_set_active_next.insert(v);
@@ -81,7 +101,10 @@ namespace conway
             }
         }
 
-        void update()
+        /**
+         * @brief Update the simulation
+         */
+        void update() noexcept
         {
             if (m_paused)
                 return;
@@ -148,8 +171,13 @@ namespace conway
         }
 
     private:
+        /**
+         * @brief Return true if cell is alive
+         * 
+         * @param v Cell position
+         */
         [[nodiscard]]
-        bool get_cell_state(const Vec2i &v) noexcept
+        bool get_cell_state(const Vec2i &v) const noexcept
         {
             return m_set_active.contains(v);
         }
@@ -164,7 +192,13 @@ namespace conway
 
 }
 
-sf::VertexArray set_to_vertex_array(const std::unordered_set<conway::Vec2i, conway::HashVec2i> &positions)
+/**
+ * @brief Convert a set to vertices
+ * 
+ * @param positions Alive cells positions
+ */
+[[nodiscard]]
+sf::VertexArray set_to_vertex_array(const std::unordered_set<conway::Vec2i, conway::HashVec2i> &positions) noexcept
 {
     constexpr float size{1.0f};
     constexpr float hsize{0.5f * size};
