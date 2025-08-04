@@ -368,8 +368,8 @@ int main()
         {
             if (ImGui::BeginTabItem("Info"))
             {
-                ImGui::Text("Active cells : %d", gol.get_cell_count());
-                ImGui::Text("Potential cells : %d", gol.get_potential_count());
+                ImGui::Text("Active cells : %llu", gol.get_cell_count());
+                ImGui::Text("Potential cells : %llu", gol.get_potential_count());
                 ImGui::Text("Simulation time : %dms", simu_time);
                 ImGui::Text("Draw time : %dms", draw_time);
                 if (ImGui::Button("Pause"))
