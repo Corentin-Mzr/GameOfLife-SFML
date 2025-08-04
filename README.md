@@ -8,7 +8,7 @@ Based on [**Game Of Life Implementation**](https://www.youtube.com/watch?v=OqfHI
 
 ## Example
 
-WIP
+![Example](example.gif)
 
 ## Controls
 
