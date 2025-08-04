@@ -14,7 +14,8 @@ Based on [**Game Of Life Implementation**](https://www.youtube.com/watch?v=OqfHI
 
 - WASD - ZQSD: Move Camera
 - P: Toggle Pause
-- R: Cleanup scene
+- R: Cleanup Scene
+- O: Toggle Optimization
 - LMB: Spawn one cell
 - RMB: Spawn multiple cells
 - Mouse Wheel: Zoom
