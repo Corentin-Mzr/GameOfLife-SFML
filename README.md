@@ -1,19 +1,31 @@
-# SFML Conway Game Of Life
+# SFML Conway's Game Of Life
 
 ## Description
 
 Implementation of Conway's Game Of Life using C++, SFML and Sparse Encoding.
-Based on [**Game Of Life Implementation**](https://www.youtube.com/watch?v=OqfHIujOvnE) by Javidx9
 
-## Gameplay
+Based on [**Game Of Life Implementation**](https://www.youtube.com/watch?v=OqfHIujOvnE) by Javidx9.
+
+## Example
 
 WIP
 
+## Controls
+
+- WASD - ZQSD: Move Camera
+- P: Toggle Pause
+- R: Cleanup scene
+- LMB: Spawn one cell
+- RMB: Spawn multiple cells
+- Mouse Wheel: Zoom
+- ESC: Close window
+
 ## Table of contents
 
-- [SFML Conway Game Of Life](#sfml-conway-game-of-life)
+- [SFML Conway's Game Of Life](#sfml-conways-game-of-life)
 - [Description](#description)
-- [Gameplay](#gameplay)
+- [Example](#example)
+- [Controls](#controls)
 - [Table of Contents](#table-of-contents)
 - [Installation](#installation)
   - [Prerequisites](#prerequisites)
@@ -21,14 +33,13 @@ WIP
   - [Build the project](#build-the-project)
   - [Run the program](#run-the-program)
 - [Libraries](#libraries)
-- [Controls](#controls)
 - [License](#license)
 
 ## Installation
 
 ### Prerequisites
 
-- C++/C compiler (gcc, g++, cl, clang)
+- C++ compiler (gcc, g++, cl, clang)
 - CMake 3.28 or newer
 
 For Linux/Ubuntu, you also need to install the following dependencies:  
@@ -55,12 +66,12 @@ sudo apt-get install -y libx11-dev \
 ### Clone the repository
 
 ```bash
-git clone https://github.com/Corentin-Mzr/<project-name.git>
+git clone https://github.com/Corentin-Mzr/GameOfLife-SFML.git
 ```
 
 ### Build the project
 
-From the root folder, execute the following commands
+From the root folder, execute the following commands:
 
 ```bash
 cmake -B build
@@ -69,23 +80,19 @@ cmake --build build
 
 ### Run the program
 
-To run the program, launch it from the build/bin folder
+To run the program, launch it from the build/bin folder:
 
 ```bash
 cd build/bin
-./<exe-name>.exe
+./SFML-Conway.exe
 ```
 
 ## Libraries
 
-The following libraries have been used for this program
+The following libraries have been used for this program:
 
 - [**SFML 3.0**](https://github.com/SFML/SFML)
 - [**ImGui**](https://github.com/ocornut/imgui)
-
-## Controls
-
-Left / Right / Up / Down / Mouse
 
 ## License
 
