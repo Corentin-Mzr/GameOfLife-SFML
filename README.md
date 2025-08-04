@@ -41,6 +41,7 @@ Based on [**Game Of Life Implementation**](https://www.youtube.com/watch?v=OqfHI
 
 - C++ compiler (gcc, g++, cl, clang)
 - CMake 3.28 or newer
+- OpenMP
 
 For Linux/Ubuntu, you also need to install the following dependencies:  
 

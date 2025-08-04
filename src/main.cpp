@@ -2,8 +2,9 @@
 #include <unordered_set>
 #include <iostream>
 #include <cmath>
-#include "imgui.h"
-#include "imgui-SFML.h"
+#include <imgui.h>
+#include <imgui-SFML.h>
+#include <omp.h>
 
 namespace conway
 {
@@ -61,6 +62,12 @@ namespace conway
         const std::unordered_set<Vec2i, HashVec2i> &get_cells() const noexcept
         {
             return m_alive_cells;
+        }
+
+        [[nodiscard]]
+        bool is_paused() const noexcept
+        {
+            return m_paused;
         }
 
         /**
@@ -122,6 +129,7 @@ namespace conway
             std::unordered_map<Vec2i, int, HashVec2i> next_neighbor_counts{};
             next_neighbor_counts.reserve(m_neighbor_counts.size());
 
+            // #pragma omp parallel for schedule(static)
             for (const auto &[cell, neighbor_count] : m_neighbor_counts)
             {
                 bool is_alive{m_alive_cells.contains(cell)};
@@ -143,6 +151,71 @@ namespace conway
                 {
                     next_alive.insert(cell);
                     update_neighbor_counts_map(next_neighbor_counts, cell, 1);
+                }
+            }
+
+            m_alive_cells = std::move(next_alive);
+            m_neighbor_counts = std::move(next_neighbor_counts);
+        }
+
+        void update_optimized() noexcept
+        {
+            if (m_paused)
+                return;
+
+            std::vector<std::unordered_set<Vec2i, HashVec2i>> thread_alive_sets{};
+            std::vector<std::unordered_map<Vec2i, int, HashVec2i>> thread_neighbor_maps{};
+
+            int num_threads{omp_get_max_threads()};
+            thread_alive_sets.resize(num_threads);
+            thread_neighbor_maps.resize(num_threads);
+
+            std::vector<std::pair<Vec2i, int>> neighbor_pairs{};
+            neighbor_pairs.reserve(m_neighbor_counts.size());
+            for (const auto &pair : m_neighbor_counts)
+            {
+                neighbor_pairs.emplace_back(pair);
+            }
+
+#pragma omp parallel
+            {
+                int tid{omp_get_thread_num()};
+                auto &alive_set{thread_alive_sets[tid]};
+                auto &neighbor_map{thread_neighbor_maps[tid]};
+
+#pragma omp for schedule(static)
+                for (std::size_t i = 0; i < neighbor_pairs.size(); ++i)
+                // for (auto it = m_neighbor_counts.begin(); it != m_neighbor_counts.end(); ++it)
+                {
+                    // const auto cell{it->first};
+                    // int neighbor_count{it->second};
+                    const auto &[cell, neighbor_count]{neighbor_pairs[i]};
+
+                    bool is_alive{m_alive_cells.contains(cell)};
+                    bool will_be_alive{(is_alive && (neighbor_count == 2 || neighbor_count == 3)) || (!is_alive && neighbor_count == 3)};
+
+                    if (will_be_alive)
+                    {
+                        alive_set.insert(cell);
+                        update_neighbor_counts_map(neighbor_map, cell, 1);
+                    }
+                }
+            }
+
+            // Fuse
+            std::unordered_set<Vec2i, HashVec2i> next_alive{};
+            std::unordered_map<Vec2i, int, HashVec2i> next_neighbor_counts{};
+
+            for (auto &alive_set : thread_alive_sets)
+            {
+                next_alive.insert(alive_set.begin(), alive_set.end());
+            }
+
+            for (auto &local_map : thread_neighbor_maps)
+            {
+                for (auto &[key, value] : local_map)
+                {
+                    next_neighbor_counts[key] += value;
                 }
             }
 
@@ -217,26 +290,30 @@ sf::VertexArray set_to_vertex_array(const std::unordered_set<conway::Vec2i, conw
 {
     constexpr float size{1.0f};
     constexpr float hsize{0.5f * size};
-    sf::VertexArray triangles(sf::PrimitiveType::Triangles, positions.size() * 6);
+    constexpr int vertex_per_cell{6};
+    sf::VertexArray triangles{sf::PrimitiveType::Triangles, positions.size() * vertex_per_cell};
+    std::vector<conway::Vec2i> positions_vec(positions.begin(), positions.end());
 
-    std::size_t i{};
-    for (const auto &pos : positions)
+#pragma omp parallel for schedule(static)
+    for (std::size_t i = 0; i < positions.size(); ++i)
     {
-        float x = static_cast<float>(pos.x) * size;
-        float y = static_cast<float>(pos.y) * size;
+        const auto &pos{positions_vec[i]};
+        float x{static_cast<float>(pos.x) * size};
+        float y{static_cast<float>(pos.y) * size};
+        std::size_t base{vertex_per_cell * i};
 
-        sf::Vector2f topLeft(x - hsize, y - hsize);
-        sf::Vector2f topRight(x + hsize, y - hsize);
-        sf::Vector2f bottomRight(x + hsize, y + hsize);
-        sf::Vector2f bottomLeft(x - hsize, y + hsize);
+        sf::Vector2f topLeft{x - hsize, y - hsize};
+        sf::Vector2f topRight{x + hsize, y - hsize};
+        sf::Vector2f bottomRight{x + hsize, y + hsize};
+        sf::Vector2f bottomLeft{x - hsize, y + hsize};
 
-        triangles[i++] = sf::Vertex(topLeft, sf::Color::White);
-        triangles[i++] = sf::Vertex(topRight, sf::Color::White);
-        triangles[i++] = sf::Vertex(bottomRight, sf::Color::White);
+        triangles[base + 0] = sf::Vertex(topLeft, sf::Color::White);
+        triangles[base + 1] = sf::Vertex(topRight, sf::Color::White);
+        triangles[base + 2] = sf::Vertex(bottomRight, sf::Color::White);
 
-        triangles[i++] = sf::Vertex(bottomRight, sf::Color::White);
-        triangles[i++] = sf::Vertex(bottomLeft, sf::Color::White);
-        triangles[i++] = sf::Vertex(topLeft, sf::Color::White);
+        triangles[base + 3] = sf::Vertex(bottomRight, sf::Color::White);
+        triangles[base + 4] = sf::Vertex(bottomLeft, sf::Color::White);
+        triangles[base + 5] = sf::Vertex(topLeft, sf::Color::White);
     }
 
     return triangles;
@@ -245,21 +322,21 @@ sf::VertexArray set_to_vertex_array(const std::unordered_set<conway::Vec2i, conw
 int main()
 {
     srand(clock());
-
     conway::GameOfLife gol{};
 
     sf::RenderWindow window(sf::VideoMode({1280, 720}), "Infinite Conway Game Of Life");
     sf::View view{{0.0f, 0.0f}, {500.0f, 250.0f}};
-    window.setView(view);
     sf::Clock delta_clock{};
     sf::Clock input_clock{};
     sf::Clock profiling_clock{};
+    window.setView(view);
 
     constexpr float zoom_factor{0.1f};
     float camera_spd{0.1f};
     int simu_time{};
     int draw_time{};
     float input_dt{};
+    bool use_optimization{false};
 
     if (!ImGui::SFML::Init(window))
     {
@@ -279,8 +356,15 @@ int main()
         {
             ImGui::SFML::ProcessEvent(window, *event);
 
+            if (ImGui::GetIO().WantCaptureMouse)
+            {
+                continue;
+            }
+
             if (event->is<sf::Event::Closed>())
+            {
                 window.close();
+            }
 
             if (const auto *key_pressed = event->getIf<sf::Event::KeyPressed>())
             {
@@ -301,6 +385,12 @@ int main()
                 {
                     gol.cleanup();
                 }
+
+                /* Toggle optimization */
+                if (key_pressed->scancode == sf::Keyboard::Scancode::O)
+                {
+                    use_optimization = !use_optimization;
+                }
             }
 
             /* Zoom with wheel */
@@ -315,7 +405,7 @@ int main()
         }
 
         /* Add on cell on screen with left click */
-        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && !ImGui::GetIO().WantCaptureMouse)
         {
             sf::Vector2i mouse_local{sf::Mouse::getPosition(window)};
             sf::Vector2f world_pos{window.mapPixelToCoords(mouse_local)};
@@ -323,7 +413,7 @@ int main()
         }
 
         /* Add a bunch of cells on screen with right click */
-        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Right))
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Right) && !ImGui::GetIO().WantCaptureMouse)
         {
             sf::Vector2i mouse_local{sf::Mouse::getPosition(window)};
             sf::Vector2f world_pos{window.mapPixelToCoords(mouse_local)};
@@ -372,6 +462,8 @@ int main()
                 ImGui::Text("Potential cells : %llu", gol.get_potential_count());
                 ImGui::Text("Simulation time : %dms", simu_time);
                 ImGui::Text("Draw time : %dms", draw_time);
+                ImGui::Text("Paused: %s", gol.is_paused() ? "ON" : "OFF");
+                ImGui::Text("Optimization: %s", use_optimization ? "ON" : "OFF");
                 if (ImGui::Button("Pause"))
                 {
                     gol.toggle_pause();
@@ -389,6 +481,7 @@ int main()
                 ImGui::Text("WASD: Move camera");
                 ImGui::Text("P: Toggle pause");
                 ImGui::Text("R: Reset");
+                ImGui::Text("O: Toggle Optimization");
                 ImGui::Text("LMB: Spawn one cell");
                 ImGui::Text("RMB: Spawn multiple cells");
                 ImGui::Text("Mouse Wheel: Zoom");
@@ -409,7 +502,14 @@ int main()
 
         /* Update simu */
         profiling_clock.restart();
-        gol.update();
+        if (use_optimization)
+        {
+            gol.update_optimized();
+        }
+        else
+        {
+            gol.update();
+        }
         simu_time = profiling_clock.restart().asMilliseconds();
 
         /* Draw */

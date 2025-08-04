@@ -13,6 +13,8 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
     ${CMAKE_SOURCE_DIR}/src/*.cpp
 )
 
+# OpenMP
+find_package(OpenMP REQUIRED)
 
 # Fetch SFML, Dear ImGUI, ImGUI-SFML
 include(FetchContent)
@@ -70,5 +72,6 @@ target_link_libraries(${PROJECT_NAME}
 PRIVATE 
 SFML::Graphics 
 ImGui-SFML::ImGui-SFML
+OpenMP::OpenMP_CXX
 )
 
