@@ -2,7 +2,7 @@
 
 ## Description
 
-Implementation of Conway Game Of Life using C++, SFML and Sparse Encoding.
+Implementation of Conway's Game Of Life using C++, SFML and Sparse Encoding.
 Based on [**Game Of Life Implementation**](https://www.youtube.com/watch?v=OqfHIujOvnE) by Javidx9
 
 ## Gameplay
