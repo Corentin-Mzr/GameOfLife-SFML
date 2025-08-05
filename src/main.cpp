@@ -332,7 +332,7 @@ int main()
     window.setView(view);
 
     constexpr float zoom_factor{0.1f};
-    float camera_spd{0.1f};
+    float camera_spd{100.0f};
     int simu_time{};
     int draw_time{};
     float input_dt{};
@@ -432,22 +432,22 @@ int main()
         /* Move in world with WASD - ZQSD */
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::W))
         {
-            dpos.y += -camera_spd * input_dt;
+            dpos.y += -1.0f;
         }
 
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::A))
         {
-            dpos.x += -camera_spd * input_dt;
+            dpos.x += -1.0f;
         }
 
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::S))
         {
-            dpos.y += camera_spd * input_dt;
+            dpos.y += 1.0f;
         }
 
         if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::D))
         {
-            dpos.x += camera_spd * input_dt;
+            dpos.x += 1.0f;
         }
 
         /* Uodate ImGui */
@@ -495,7 +495,7 @@ int main()
         ImGui::End();
 
         /* Update view */
-        new_view_center = dpos.lengthSquared() != 0 ? new_view_center + dpos.normalized() : new_view_center;
+        new_view_center = dpos.lengthSquared() != 0 ? new_view_center + camera_spd * input_dt * dpos.normalized() : new_view_center;
         new_view.setCenter(new_view_center);
         new_view.zoom(view_zoom);
         window.setView(new_view);
