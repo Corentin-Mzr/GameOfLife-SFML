@@ -57,7 +57,13 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y libx11-dev libxcursor-dev libxi-dev libxrandr-dev libudev-dev libgl1-mesa-dev libfreetype6-dev libjpeg-dev libopenal-dev libflac-dev libvorbis-dev libxcb1-dev libxcb-image0-dev libxcb-randr0-dev libxcb-xtest0-dev
-    # sudo apt-get install -y libx11-dev libxrandr-dev libxcursor-dev libxi-dev libgl1-mesa-dev
+
+    - if: matrix.os == 'windows-latest'
+      name: Install dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install libomp-dev
 
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
