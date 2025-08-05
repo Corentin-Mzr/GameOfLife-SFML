@@ -184,7 +184,7 @@ namespace conway
                 auto &neighbor_map{thread_neighbor_maps[tid]};
 
 #pragma omp for schedule(static)
-                for (std::size_t i = 0; i < neighbor_pairs.size(); ++i)
+                for (int i = 0; i < static_cast<int>(neighbor_pairs.size()); ++i)
                 // for (auto it = m_neighbor_counts.begin(); it != m_neighbor_counts.end(); ++it)
                 {
                     // const auto cell{it->first};
@@ -295,12 +295,12 @@ sf::VertexArray set_to_vertex_array(const std::unordered_set<conway::Vec2i, conw
     std::vector<conway::Vec2i> positions_vec(positions.begin(), positions.end());
 
 #pragma omp parallel for schedule(static)
-    for (std::size_t i = 0; i < positions.size(); ++i)
+    for (int i = 0; i < static_cast<int>(positions.size()); ++i)
     {
         const auto &pos{positions_vec[i]};
         float x{static_cast<float>(pos.x) * size};
         float y{static_cast<float>(pos.y) * size};
-        std::size_t base{vertex_per_cell * i};
+        std::size_t base{static_cast<std::size_t>(vertex_per_cell * i)};
 
         sf::Vector2f topLeft{x - hsize, y - hsize};
         sf::Vector2f topRight{x + hsize, y - hsize};
