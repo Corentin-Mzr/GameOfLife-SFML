@@ -12,7 +12,7 @@ Based on [**Game Of Life Implementation**](https://www.youtube.com/watch?v=OqfHI
 
 ## Controls
 
-- WASD - ZQSD: Move Camera
+- WASD - ZQSD - Arrows: Move Camera
 - P: Toggle Pause
 - R: Cleanup Scene
 - O: Toggle Optimization

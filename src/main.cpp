@@ -19,6 +19,12 @@ namespace conway
         {
             return x == o.x && y == o.y;
         }
+
+        [[nodiscard]]
+        Vec2i operator+(const Vec2i &o) const noexcept
+        {
+            return Vec2i{x + o.x, y + o.y};
+        }
     };
 
     struct HashVec2i
@@ -129,22 +135,15 @@ namespace conway
             std::unordered_map<Vec2i, int, HashVec2i> next_neighbor_counts{};
             next_neighbor_counts.reserve(m_neighbor_counts.size());
 
-            // #pragma omp parallel for schedule(static)
             for (const auto &[cell, neighbor_count] : m_neighbor_counts)
             {
                 bool is_alive{m_alive_cells.contains(cell)};
-                bool will_be_alive{false};
 
-                // Live cell survives with 2 or 3 neighbors
-                if (is_alive)
-                {
-                    will_be_alive = (neighbor_count == 2 || neighbor_count == 3);
-                }
-                // Dead cell becomes alive with exactly 3 neighbors
-                else
-                {
-                    will_be_alive = (neighbor_count == 3);
-                }
+                /*
+                - Live cell survives with 2 or 3 neighbors
+                - Dead cell becomes alive with exactly 3 neighbors
+                */
+                bool will_be_alive{(is_alive && (neighbor_count == 2 || neighbor_count == 3)) || (!is_alive && (neighbor_count == 3))};
 
                 // Update neighbor counts for the next generation
                 if (will_be_alive)
@@ -158,6 +157,9 @@ namespace conway
             m_neighbor_counts = std::move(next_neighbor_counts);
         }
 
+        /**
+         * @brief Update the simulation in parallel
+         */
         void update_optimized() noexcept
         {
             if (m_paused)
@@ -185,13 +187,15 @@ namespace conway
 
 #pragma omp for schedule(static)
                 for (int i = 0; i < static_cast<int>(neighbor_pairs.size()); ++i)
-                // for (auto it = m_neighbor_counts.begin(); it != m_neighbor_counts.end(); ++it)
                 {
-                    // const auto cell{it->first};
-                    // int neighbor_count{it->second};
                     const auto &[cell, neighbor_count]{neighbor_pairs[i]};
 
                     bool is_alive{m_alive_cells.contains(cell)};
+
+                    /*
+                    - Live cell survives with 2 or 3 neighbors
+                    - Dead cell becomes alive with exactly 3 neighbors
+                    */
                     bool will_be_alive{(is_alive && (neighbor_count == 2 || neighbor_count == 3)) || (!is_alive && neighbor_count == 3)};
 
                     if (will_be_alive)
@@ -324,19 +328,32 @@ int main()
     srand(clock());
     conway::GameOfLife gol{};
 
+    /* Window */
     sf::RenderWindow window(sf::VideoMode({1280, 720}), "Infinite Conway Game Of Life");
     sf::View view{{0.0f, 0.0f}, {500.0f, 250.0f}};
-    sf::Clock delta_clock{};
-    sf::Clock input_clock{};
-    sf::Clock profiling_clock{};
     window.setView(view);
 
-    constexpr float zoom_factor{0.1f};
-    float camera_spd{100.0f};
+    /* ImGui */
+    sf::Clock delta_clock{};
+    sf::Clock profiling_clock{};
     int simu_time{};
     int draw_time{};
-    float input_dt{};
     bool use_optimization{false};
+
+    /* Camera */
+    sf::View new_view{};
+    sf::Vector2f new_view_center{};
+    sf::Vector2f dpos{};
+    sf::Clock input_clock{};
+    constexpr float zoom_factor{0.1f};
+    float view_zoom{1.0f};
+    float camera_spd{100.0f};
+    float input_dt{};
+
+    /* Add cells */
+    sf::Vector2i mouse_local{};
+    sf::Vector2f world_pos{};
+    conway::Vec2i converted_pos{};
 
     if (!ImGui::SFML::Init(window))
     {
@@ -346,10 +363,11 @@ int main()
 
     while (window.isOpen())
     {
-        float view_zoom{1.0f};
-        sf::View new_view{window.getView()};
-        sf::Vector2f new_view_center{new_view.getCenter()};
-        sf::Vector2f dpos{};
+        /* Reset camera info */
+        view_zoom = 1.0f;
+        new_view = window.getView();
+        new_view_center = new_view.getCenter();
+        dpos = {0.0f, 0.0f};
         input_dt = input_clock.restart().asSeconds();
 
         while (const std::optional event = window.pollEvent())
@@ -407,45 +425,49 @@ int main()
         /* Add on cell on screen with left click */
         if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && !ImGui::GetIO().WantCaptureMouse)
         {
-            sf::Vector2i mouse_local{sf::Mouse::getPosition(window)};
-            sf::Vector2f world_pos{window.mapPixelToCoords(mouse_local)};
-            gol.add_alive_cell(conway::Vec2i{static_cast<int>(std::round(world_pos.x)), static_cast<int>(std::round(world_pos.y))});
+            mouse_local = sf::Mouse::getPosition(window);
+            world_pos = window.mapPixelToCoords(mouse_local);
+            converted_pos = conway::Vec2i{static_cast<int>(std::round(world_pos.x)), static_cast<int>(std::round(world_pos.y))};
+            gol.add_alive_cell(converted_pos);
         }
 
         /* Add a bunch of cells on screen with right click */
         if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Right) && !ImGui::GetIO().WantCaptureMouse)
         {
-            sf::Vector2i mouse_local{sf::Mouse::getPosition(window)};
-            sf::Vector2f world_pos{window.mapPixelToCoords(mouse_local)};
+            mouse_local = sf::Mouse::getPosition(window);
+            world_pos = window.mapPixelToCoords(mouse_local);
+            converted_pos = conway::Vec2i{static_cast<int>(std::round(world_pos.x)), static_cast<int>(std::round(world_pos.y))};
+
             for (int i = -50; i <= 50; i++)
             {
                 for (int j = -50; j < 50; j++)
                 {
                     if (rand() % 2)
                     {
-                        gol.add_alive_cell(conway::Vec2i{static_cast<int>(std::round(world_pos.x) + i), static_cast<int>(std::round(world_pos.y) + j)});
+                        conway::Vec2i pos{i, j};
+                        gol.add_alive_cell(converted_pos + pos);
                     }
                 }
             }
         }
 
-        /* Move in world with WASD - ZQSD */
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::W))
+        /* Move in world with WASD - ZQSD - Arrows */
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::W) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::Up))
         {
             dpos.y += -1.0f;
         }
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::A))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::A) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::Left))
         {
             dpos.x += -1.0f;
         }
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::S))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::Down))
         {
             dpos.y += 1.0f;
         }
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::D))
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Scancode::Right))
         {
             dpos.x += 1.0f;
         }
@@ -468,6 +490,7 @@ int main()
                 {
                     gol.toggle_pause();
                 }
+                ImGui::SameLine();
                 if (ImGui::Button("Reset"))
                 {
                     gol.cleanup();
@@ -478,7 +501,7 @@ int main()
 
             if (ImGui::BeginTabItem("Inputs"))
             {
-                ImGui::Text("WASD: Move camera");
+                ImGui::Text("WASD - Arrows: Move camera");
                 ImGui::Text("P: Toggle pause");
                 ImGui::Text("R: Reset");
                 ImGui::Text("O: Toggle Optimization");
@@ -495,7 +518,7 @@ int main()
         ImGui::End();
 
         /* Update view */
-        new_view_center = dpos.lengthSquared() != 0 ? new_view_center + camera_spd * input_dt * dpos.normalized() : new_view_center;
+        new_view_center = dpos.lengthSquared() != 0.0f ? new_view_center + camera_spd * input_dt * dpos.normalized() : new_view_center;
         new_view.setCenter(new_view_center);
         new_view.zoom(view_zoom);
         window.setView(new_view);
