@@ -543,4 +543,8 @@ int main()
         window.display();
         draw_time = profiling_clock.restart().asMilliseconds();
     }
+
+    ImGui::SFML::Shutdown();
+
+    return 0;
 }
