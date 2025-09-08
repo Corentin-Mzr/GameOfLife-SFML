@@ -311,13 +311,13 @@ sf::VertexArray set_to_vertex_array(const std::unordered_set<conway::Vec2i, conw
         sf::Vector2f bottomRight{x + hsize, y + hsize};
         sf::Vector2f bottomLeft{x - hsize, y + hsize};
 
-        triangles[base + 0] = sf::Vertex(topLeft, sf::Color::White);
-        triangles[base + 1] = sf::Vertex(topRight, sf::Color::White);
-        triangles[base + 2] = sf::Vertex(bottomRight, sf::Color::White);
+        triangles[base + 0] = sf::Vertex{topLeft, sf::Color::White};
+        triangles[base + 1] = sf::Vertex{topRight, sf::Color::White};
+        triangles[base + 2] = sf::Vertex{bottomRight, sf::Color::White};
 
-        triangles[base + 3] = sf::Vertex(bottomRight, sf::Color::White);
-        triangles[base + 4] = sf::Vertex(bottomLeft, sf::Color::White);
-        triangles[base + 5] = sf::Vertex(topLeft, sf::Color::White);
+        triangles[base + 3] = sf::Vertex{bottomRight, sf::Color::White};
+        triangles[base + 4] = sf::Vertex{bottomLeft, sf::Color::White};
+        triangles[base + 5] = sf::Vertex{topLeft, sf::Color::White};
     }
 
     return triangles;
